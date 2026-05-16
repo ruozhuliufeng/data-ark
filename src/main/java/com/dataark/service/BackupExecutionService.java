@@ -10,6 +10,7 @@ import com.dataark.repository.BackupJobRepository;
 import com.dataark.repository.DataSourceConfigRepository;
 import com.dataark.repository.ExecutionRecordRepository;
 import com.dataark.repository.StorageConfigRepository;
+import com.dataark.service.storage.StorageObjectKeyService;
 import com.dataark.util.DateTimes;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.scheduling.annotation.Async;
@@ -23,7 +24,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.List;
 
 @Service
 public class BackupExecutionService {
@@ -34,8 +34,8 @@ public class BackupExecutionService {
     private final ExecutionRecordRepository executionRecordRepository;
     private final BackupCommandFactory commandFactory;
     private final CommandRunner commandRunner;
-    private final RcloneConfigService rcloneConfigService;
     private final ResumableUploadService resumableUploadService;
+    private final StorageObjectKeyService storageObjectKeyService;
 
     public BackupExecutionService(DataArkProperties properties,
                                   BackupJobRepository backupJobRepository,
@@ -44,8 +44,8 @@ public class BackupExecutionService {
                                   ExecutionRecordRepository executionRecordRepository,
                                   BackupCommandFactory commandFactory,
                                   CommandRunner commandRunner,
-                                  RcloneConfigService rcloneConfigService,
-                                  ResumableUploadService resumableUploadService) {
+                                  ResumableUploadService resumableUploadService,
+                                  StorageObjectKeyService storageObjectKeyService) {
         this.properties = properties;
         this.backupJobRepository = backupJobRepository;
         this.dataSourceConfigRepository = dataSourceConfigRepository;
@@ -53,8 +53,8 @@ public class BackupExecutionService {
         this.executionRecordRepository = executionRecordRepository;
         this.commandFactory = commandFactory;
         this.commandRunner = commandRunner;
-        this.rcloneConfigService = rcloneConfigService;
         this.resumableUploadService = resumableUploadService;
+        this.storageObjectKeyService = storageObjectKeyService;
     }
 
     @PostConstruct
@@ -104,16 +104,13 @@ public class BackupExecutionService {
 
             String remotePath = "";
             if (Boolean.TRUE.equals(job.getUploadEnabled())) {
-                RcloneConfigService.PreparedRclone prepared = rcloneConfigService.prepare(storage);
-                try {
-                    remotePath = rcloneConfigService.remoteFile(prepared.getRemoteName(), storage, finalFile.getName());
-                    UploadOutcome outcome = resumableUploadService.upload(finalFile, storage, remotePath, commandLog);
-                    applyUploadOutcome(record, outcome);
-                } finally {
-                    prepared.cleanup();
-                }
+                String objectKey = storageObjectKeyService.objectKey(storage, finalFile.getName());
+                remotePath = storageObjectKeyService.displayPath(storage, objectKey);
+                UploadOutcome outcome = resumableUploadService.upload(finalFile, storage, objectKey, commandLog);
+                outcome.setRemotePath(remotePath);
+                applyUploadOutcome(record, outcome);
             } else {
-                remotePath = rcloneConfigService.remoteFile(rcloneRemoteName(storage), storage, finalFile.getName());
+                remotePath = storageObjectKeyService.displayPath(storage, storageObjectKeyService.objectKey(storage, finalFile.getName()));
             }
 
             record.setStatus(ExecutionStatus.SUCCESS);
@@ -159,14 +156,6 @@ public class BackupExecutionService {
 
     private String maskCommand(List<String> command) {
         return StringUtils.join(command, " ");
-    }
-
-    private String rcloneRemoteName(StorageConfig storage) {
-        if (StringUtils.isNotBlank(storage.getRcloneRemote())) {
-            return storage.getRcloneRemote().trim();
-        }
-        String id = storage.getId() == null ? "draft" : String.valueOf(storage.getId());
-        return "dataark-" + storage.getType().name().toLowerCase().replace('_', '-') + "-" + id;
     }
 
     private void applyUploadOutcome(ExecutionRecord record, UploadOutcome outcome) {

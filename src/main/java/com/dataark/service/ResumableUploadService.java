@@ -2,6 +2,8 @@ package com.dataark.service;
 
 import com.dataark.config.DataArkProperties;
 import com.dataark.model.StorageConfig;
+import com.dataark.service.storage.ObjectStorageClient;
+import com.dataark.service.storage.ObjectStorageClientFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -12,9 +14,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Properties;
 
 @Service
@@ -22,15 +21,12 @@ public class ResumableUploadService {
     private static final long MB = 1024L * 1024L;
 
     private final DataArkProperties properties;
-    private final CommandRunner commandRunner;
-    private final RcloneConfigService rcloneConfigService;
+    private final ObjectStorageClientFactory clientFactory;
 
     public ResumableUploadService(DataArkProperties properties,
-                                  CommandRunner commandRunner,
-                                  RcloneConfigService rcloneConfigService) {
+                                  ObjectStorageClientFactory clientFactory) {
         this.properties = properties;
-        this.commandRunner = commandRunner;
-        this.rcloneConfigService = rcloneConfigService;
+        this.clientFactory = clientFactory;
     }
 
     public UploadOutcome upload(File file,
@@ -55,24 +51,16 @@ public class ResumableUploadService {
                                        StorageConfig storage,
                                        String remotePath,
                                        StringBuilder commandLog) throws IOException {
-        RcloneConfigService.PreparedRclone prepared = rcloneConfigService.prepare(storage);
-        try {
-            List<String> command = baseRcloneCopy(file.getAbsolutePath(), remotePath, storage);
-            commandLog.append("$ ").append(maskCommand(command)).append(System.lineSeparator());
-            CommandResult result = commandRunner.run(command, prepared.getEnvironment(), new File(properties.getWorkDir()));
-            commandLog.append(result.getOutput()).append(System.lineSeparator());
-            if (result.getExitCode() != 0) {
-                throw new IllegalStateException("Rclone upload failed, exitCode=" + result.getExitCode());
-            }
-            UploadOutcome outcome = new UploadOutcome();
-            outcome.setRemotePath(remotePath);
-            outcome.setMultipartUpload(false);
-            outcome.setTotalParts(1);
-            outcome.setUploadedParts(1);
-            return outcome;
-        } finally {
-            prepared.cleanup();
-        }
+        ObjectStorageClient client = clientFactory.create(storage);
+        commandLog.append("SDK upload ").append(file.getAbsolutePath()).append(" -> ")
+                .append(remotePath).append(System.lineSeparator());
+        client.put(remotePath, file);
+        UploadOutcome outcome = new UploadOutcome();
+        outcome.setRemotePath(remotePath);
+        outcome.setMultipartUpload(false);
+        outcome.setTotalParts(1);
+        outcome.setUploadedParts(1);
+        return outcome;
     }
 
     private UploadOutcome uploadMultipart(File file,
@@ -85,33 +73,31 @@ public class ResumableUploadService {
         partsDir.mkdirs();
         splitMissingParts(file, manifest, partsDir, commandLog);
 
-        RcloneConfigService.PreparedRclone prepared = rcloneConfigService.prepare(storage);
-        int uploaded = countUploaded(manifest, prepared);
-        try {
-            for (int i = 0; i < manifest.totalParts; i++) {
-                File partFile = partFile(partsDir, file.getName(), i);
-                String partRemote = partRemotePath(remotePath, file.getName(), i);
-                if (remoteExists(partRemote, prepared, commandLog)) {
-                    markUploaded(manifest, i);
-                    uploaded = countUploaded(manifest, prepared);
-                    saveManifest(manifest);
-                    continue;
-                }
-                List<String> command = baseRcloneCopy(partFile.getAbsolutePath(), partRemote, storage);
-                commandLog.append("$ ").append(maskCommand(command)).append(System.lineSeparator());
-                CommandResult result = commandRunner.run(command, prepared.getEnvironment(), new File(properties.getWorkDir()));
-                commandLog.append(result.getOutput()).append(System.lineSeparator());
-                if (result.getExitCode() != 0) {
-                    saveManifest(manifest);
-                    throw new IllegalStateException("Multipart upload failed at part " + (i + 1) + "/" + manifest.totalParts
-                            + ", uploadedParts=" + uploaded + ", exitCode=" + result.getExitCode());
-                }
+        ObjectStorageClient client = clientFactory.create(storage);
+        int uploaded = countUploaded(manifest);
+        for (int i = 0; i < manifest.totalParts; i++) {
+            File partFile = partFile(partsDir, file.getName(), i);
+            String partRemote = partRemotePath(remotePath, file.getName(), i);
+            if (remoteExists(client, partRemote, commandLog)) {
                 markUploaded(manifest, i);
-                uploaded = countUploaded(manifest, prepared);
+                uploaded = countUploaded(manifest);
                 saveManifest(manifest);
+                continue;
             }
-        } finally {
-            prepared.cleanup();
+            commandLog.append("SDK multipart upload part ").append(i + 1).append("/")
+                    .append(manifest.totalParts).append(" ")
+                    .append(partFile.getAbsolutePath()).append(" -> ")
+                    .append(partRemote).append(System.lineSeparator());
+            try {
+                client.put(partRemote, partFile);
+            } catch (Exception e) {
+                saveManifest(manifest);
+                throw new IllegalStateException("Multipart upload failed at part " + (i + 1) + "/" + manifest.totalParts
+                        + ", uploadedParts=" + uploaded + ", message=" + e.getMessage(), e);
+            }
+            markUploaded(manifest, i);
+            uploaded = countUploaded(manifest);
+            saveManifest(manifest);
         }
 
         UploadOutcome outcome = new UploadOutcome();
@@ -237,45 +223,15 @@ public class ResumableUploadService {
         }
     }
 
-    private boolean remoteExists(String remotePath,
-                                 RcloneConfigService.PreparedRclone prepared,
-                                 StringBuilder commandLog) {
-        List<String> command = new ArrayList<String>();
-        command.add(properties.getCommand().getRclone());
-        command.add("lsf");
-        command.add(remotePath);
-        commandLog.append("$ ").append(maskCommand(command)).append(System.lineSeparator());
-        CommandResult result = commandRunner.run(command, prepared.getEnvironment(), new File(properties.getWorkDir()));
-        if (result.getExitCode() == 0) {
+    private boolean remoteExists(ObjectStorageClient client, String remotePath, StringBuilder commandLog) {
+        if (client.exists(remotePath)) {
             commandLog.append("Part exists, skip: ").append(remotePath).append(System.lineSeparator());
             return true;
         }
         return false;
     }
 
-    private List<String> baseRcloneCopy(String source, String target, StorageConfig storage) {
-        List<String> command = new ArrayList<String>();
-        command.add(properties.getCommand().getRclone());
-        command.add("copyto");
-        command.add(source);
-        command.add(target);
-        command.add("--checksum");
-        command.add("--retries");
-        command.add(String.valueOf(uploadRetries(storage)));
-        command.add("--low-level-retries");
-        command.add(String.valueOf(uploadRetries(storage) * 3));
-        command.add("--s3-upload-concurrency");
-        command.add(String.valueOf(uploadConcurrency(storage)));
-        command.add("--s3-upload-cutoff");
-        command.add(Math.min(chunkMb(storage), 5120L) + "M");
-        command.add("--s3-chunk-size");
-        command.add(chunkMb(storage) + "M");
-        command.add("--s3-leave-parts-on-error");
-        command.addAll(extraArgs(storage));
-        return command;
-    }
-
-    private int countUploaded(MultipartManifest manifest, RcloneConfigService.PreparedRclone prepared) {
+    private int countUploaded(MultipartManifest manifest) {
         return StringUtils.isBlank(manifest.uploadedParts) ? 0 : manifest.uploadedParts.split(",").length;
     }
 
@@ -314,38 +270,12 @@ public class ResumableUploadService {
         return Math.max(5L, defaultLong(storage.getMultipartChunkMb(), 64L));
     }
 
-    private int uploadRetries(StorageConfig storage) {
-        return Math.max(1, storage.getUploadRetries() == null ? 3 : storage.getUploadRetries());
-    }
-
-    private int uploadConcurrency(StorageConfig storage) {
-        return Math.max(1, storage.getUploadConcurrency() == null ? 4 : storage.getUploadConcurrency());
-    }
-
-    private List<String> extraArgs(StorageConfig storage) {
-        if (StringUtils.isBlank(storage.getExtraArgs())) {
-            return Collections.emptyList();
-        }
-        String[] parts = storage.getExtraArgs().trim().split("\\s+");
-        List<String> args = new ArrayList<String>();
-        for (String part : parts) {
-            if (StringUtils.isNotBlank(part)) {
-                args.add(part);
-            }
-        }
-        return args;
-    }
-
     private long defaultLong(Long value, long fallback) {
         return value == null ? fallback : value;
     }
 
     private String safeName(String value) {
         return StringUtils.defaultString(value, "file").replaceAll("[^a-zA-Z0-9._-]", "_");
-    }
-
-    private String maskCommand(List<String> command) {
-        return StringUtils.join(command, " ");
     }
 
     private static class MultipartManifest {

@@ -18,4 +18,3 @@ services:
       - ./work:/app/work
       - ./backup:/app/backup
       - ./logs:/app/logs
-      - ./config/rclone:/root/.config/rclone

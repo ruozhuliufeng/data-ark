@@ -1,6 +1,6 @@
 # DataArk
 
-DataArk 是一个一体化数据库备份与对象存储同步平台。第一版目标是通过页面配置数据源、OSS/对象存储、备份任务和 Cron 定时计划，然后由后端执行 dump、压缩和 rclone 上传。
+DataArk 是一个一体化数据库备份与对象存储同步平台。第一版目标是通过页面配置数据源、OSS/对象存储、备份任务和 Cron 定时计划，然后由后端执行 dump、压缩和 SDK 上传。
 
 ## 第一版范围
 
@@ -18,7 +18,7 @@ DataArk 是一个一体化数据库备份与对象存储同步平台。第一版
 - Spring Data JPA
 - SQLite
 - Vue 3 + TypeScript + Vite + Element Plus
-- rclone
+- 对象存储 SDK：AWS S3、MinIO、阿里云 OSS、腾讯云 COS、华为云 OBS、七牛 Kodo、WebDAV
 - mysqldump / pg_dump
 
 当前仓库为了适配本机 JDK 1.8，使用 Spring Boot 2.7。后续如果部署环境切到 Java 21，可以升级到 Spring Boot 3。
@@ -71,12 +71,12 @@ http://服务器IP:7001
 挂载目录：
 
 ```text
-./config            初始化配置和 rclone 配置
+./config            初始化配置
 ./data              SQLite 数据库
 ./backup            本地备份文件
 ./work              任务工作目录
 ./logs              日志目录
-./config/rclone     rclone 配置
+./config/rclone     历史兼容目录，当前 SDK 上传不依赖 rclone.conf
 ```
 
 ## 首次初始化
@@ -101,26 +101,9 @@ http://服务器IP:7001
 config/dataark.properties
 ```
 
-## rclone 配置
+## 存储配置
 
-先创建配置：
-
-```bash
-mkdir -p config/rclone
-cp config/rclone/rclone.conf.example config/rclone/rclone.conf
-```
-
-也可以使用 rclone 命令生成：
-
-```bash
-rclone config --config ./config/rclone/rclone.conf
-```
-
-页面里的 `Rclone Remote` 填 `rclone.conf` 中的 remote 名称，例如：
-
-```text
-minio
-```
+存储配置参考 `dromara/x-file-storage` 的平台化思路，但不依赖 `x-file-storage` 包本身。DataArk 内置各平台 SDK 适配器，页面只需要填写平台标识、类型、AK/SK、Bucket、地点/Region、Endpoint、基础路径等公共信息。
 
 更多配置和验证说明见：
 
@@ -131,7 +114,7 @@ docs/storage-testing.md
 页面支持：
 
 - 测试数据库连接：MySQL/PostgreSQL 使用 JDBC 执行 `select 1`
-- 测试存储连通：执行 `rclone lsd`
+- 测试存储连通：通过对应平台 SDK 验证 Bucket 和基础路径
 - 测试上传：生成临时探针文件并上传到 `{basePath}/_probe/`
 
 ## 备份命令依赖
@@ -141,11 +124,11 @@ DataArk 第一版调用数据库官方客户端：
 ```text
 MySQL      -> mysqldump
 PostgreSQL -> pg_dump
-上传       -> rclone copyto
+上传       -> 云厂商/协议 SDK
 压缩       -> gzip
 ```
 
-本机运行时需要提前安装这些命令。Docker 镜像会内置 `rclone`、`default-mysql-client`、`postgresql-client` 和 `gzip`。
+本机运行时需要提前安装数据库备份命令和 `gzip`。Docker 镜像会内置 `default-mysql-client`、`postgresql-client` 和 `gzip`；对象存储上传由 Java SDK 完成。
 
 ## Cron 说明
 

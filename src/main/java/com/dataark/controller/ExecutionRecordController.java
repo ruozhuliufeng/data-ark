@@ -8,6 +8,7 @@ import com.dataark.repository.ExecutionRecordRepository;
 import com.dataark.repository.StorageConfigRepository;
 import com.dataark.service.ResumableUploadService;
 import com.dataark.service.UploadOutcome;
+import com.dataark.service.storage.StorageObjectKeyService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,13 +26,16 @@ public class ExecutionRecordController {
     private final ExecutionRecordRepository repository;
     private final StorageConfigRepository storageConfigRepository;
     private final ResumableUploadService resumableUploadService;
+    private final StorageObjectKeyService storageObjectKeyService;
 
     public ExecutionRecordController(ExecutionRecordRepository repository,
                                      StorageConfigRepository storageConfigRepository,
-                                     ResumableUploadService resumableUploadService) {
+                                     ResumableUploadService resumableUploadService,
+                                     StorageObjectKeyService storageObjectKeyService) {
         this.repository = repository;
         this.storageConfigRepository = storageConfigRepository;
         this.resumableUploadService = resumableUploadService;
+        this.storageObjectKeyService = storageObjectKeyService;
     }
 
     @GetMapping
@@ -60,6 +64,7 @@ public class ExecutionRecordController {
 
         StorageConfig storage = storageConfigRepository.findById(record.getStorageId())
                 .orElseThrow(() -> new IllegalArgumentException("Storage config not found: " + record.getStorageId()));
+        String objectKey = storageObjectKeyService.objectKey(storage, new File(record.getLocalFile()).getName());
         StringBuilder commandLog = new StringBuilder(record.getCommandLog() == null ? "" : record.getCommandLog());
         commandLog.append(System.lineSeparator()).append("Resume multipart upload at ")
                 .append(LocalDateTime.now()).append(System.lineSeparator());
@@ -71,11 +76,12 @@ public class ExecutionRecordController {
             UploadOutcome outcome = resumableUploadService.resume(
                     new File(record.getLocalFile()),
                     storage,
-                    record.getRemotePath(),
+                    objectKey,
                     record.getManifestFile(),
                     commandLog);
             record.setStatus(ExecutionStatus.SUCCESS);
             record.setMessage("Resume upload completed");
+            record.setRemotePath(storageObjectKeyService.displayPath(storage, objectKey));
             record.setMultipartUpload(outcome.isMultipartUpload());
             record.setTotalParts(outcome.getTotalParts());
             record.setUploadedParts(outcome.getUploadedParts());

@@ -117,7 +117,7 @@
                 <Cloudy />
                 <div>
                   <strong>多 OSS 连通测试</strong>
-                  <span>填写 AK/SK、Bucket、地点后自动生成 rclone 配置验证</span>
+                  <span>填写 AK/SK、Bucket、地点后通过内置 SDK 验证</span>
                 </div>
               </div>
               <div class="check-row">
@@ -160,7 +160,7 @@
         <div class="panel-title">
           <div>
             <h2>OSS / 对象存储</h2>
-            <p>S3、MinIO、阿里云 OSS、腾讯云 COS、华为 OBS、七牛、WebDAV 统一通过 rclone 验证和上传</p>
+            <p>S3、MinIO、阿里云 OSS、腾讯云 COS、华为 OBS、七牛、WebDAV 统一通过 SDK 验证和上传</p>
           </div>
           <el-button type="primary" :icon="Plus" @click="openStorage()">新增存储</el-button>
         </div>
@@ -220,7 +220,7 @@
         <div class="panel-title">
           <div>
             <h2>执行记录</h2>
-            <p>点击记录查看 dump、gzip、rclone 的完整命令日志</p>
+            <p>点击记录查看 dump、gzip、SDK 上传的完整执行日志</p>
           </div>
           <el-tag effect="plain">最近 100 条</el-tag>
         </div>
@@ -322,8 +322,8 @@
           <el-form-item label="分片大小(MB)"><el-input-number v-model="storageForm.multipartChunkMb" :min="5" style="width: 100%" /></el-form-item>
           <el-form-item label="上传并发"><el-input-number v-model="storageForm.uploadConcurrency" :min="1" :max="32" style="width: 100%" /></el-form-item>
           <el-form-item label="失败重试次数"><el-input-number v-model="storageForm.uploadRetries" :min="1" :max="20" style="width: 100%" /></el-form-item>
-          <el-form-item label="rclone 参数" class="full">
-            <el-input v-model="storageForm.extraArgs" placeholder="可选，例如 --transfers 4 --checkers 8" />
+          <el-form-item label="扩展参数" class="full">
+            <el-input v-model="storageForm.extraArgs" placeholder="预留字段，可按平台填写高级参数" />
           </el-form-item>
           <el-form-item label="补充信息" class="full">
             <el-input v-model="storageForm.configJson" type="textarea" :rows="2" placeholder="可选：备注或后续扩展配置" />

@@ -23,7 +23,7 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       gzip ca-certificates rclone default-mysql-client postgresql-client \
+       gzip ca-certificates default-mysql-client postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /build/target/data-ark-0.1.0-SNAPSHOT.jar /app/data-ark.jar
@@ -35,7 +35,7 @@ ENV DATAARK_PORT=7001 \
     DATAARK_BACKUP_DIR=/app/backup \
     DATAARK_LOG_DIR=/app/logs
 
-VOLUME ["/app/config", "/app/data", "/app/work", "/app/backup", "/app/logs", "/root/.config/rclone"]
+VOLUME ["/app/config", "/app/data", "/app/work", "/app/backup", "/app/logs"]
 EXPOSE 7001
 
 ENTRYPOINT ["java", "-jar", "/app/data-ark.jar"]
