@@ -23,6 +23,9 @@ public class StorageConfig {
     @Column(nullable = false)
     private String name;
 
+    private String platform;
+    private Boolean enabled = true;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -38,13 +41,18 @@ public class StorageConfig {
     private String secretKey;
     private String region;
     private String endpoint;
+    private String domain;
+    private String acl = "private";
+    private Boolean pathStyleAccess = false;
     private String vendor;
     private String webdavUrl;
     private String webdavUsername;
     private String webdavPassword;
     private Long multipartThresholdMb = 100L;
     private Long multipartChunkMb = 64L;
+    private Integer uploadConcurrency = 4;
     private Integer uploadRetries = 3;
+    private String extraArgs;
 
     @Column(nullable = false)
     private String basePath = "/";
@@ -69,6 +77,22 @@ public class StorageConfig {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
+    }
+
+    public Boolean getEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
     }
 
     public StorageType getType() {
@@ -127,6 +151,30 @@ public class StorageConfig {
         this.endpoint = endpoint;
     }
 
+    public String getDomain() {
+        return domain;
+    }
+
+    public void setDomain(String domain) {
+        this.domain = domain;
+    }
+
+    public String getAcl() {
+        return acl;
+    }
+
+    public void setAcl(String acl) {
+        this.acl = acl;
+    }
+
+    public Boolean getPathStyleAccess() {
+        return pathStyleAccess;
+    }
+
+    public void setPathStyleAccess(Boolean pathStyleAccess) {
+        this.pathStyleAccess = pathStyleAccess;
+    }
+
     public String getVendor() {
         return vendor;
     }
@@ -175,12 +223,28 @@ public class StorageConfig {
         this.multipartChunkMb = multipartChunkMb;
     }
 
+    public Integer getUploadConcurrency() {
+        return uploadConcurrency;
+    }
+
+    public void setUploadConcurrency(Integer uploadConcurrency) {
+        this.uploadConcurrency = uploadConcurrency;
+    }
+
     public Integer getUploadRetries() {
         return uploadRetries;
     }
 
     public void setUploadRetries(Integer uploadRetries) {
         this.uploadRetries = uploadRetries;
+    }
+
+    public String getExtraArgs() {
+        return extraArgs;
+    }
+
+    public void setExtraArgs(String extraArgs) {
+        this.extraArgs = extraArgs;
     }
 
     public String getBasePath() {

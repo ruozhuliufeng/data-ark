@@ -37,6 +37,7 @@ public class StorageController {
     @PostMapping
     public StorageConfig create(@Valid @RequestBody StorageConfig body) {
         body.setId(null);
+        fillDefaults(body);
         fillInternalRemote(body);
         body.setCreatedAt(LocalDateTime.now());
         body.setUpdatedAt(LocalDateTime.now());
@@ -48,6 +49,8 @@ public class StorageController {
         StorageConfig entity = repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Storage config not found: " + id));
         entity.setName(body.getName());
+        entity.setPlatform(body.getPlatform());
+        entity.setEnabled(body.getEnabled());
         entity.setType(body.getType());
         entity.setRcloneRemote(StringUtils.defaultIfBlank(body.getRcloneRemote(), entity.getRcloneRemote()));
         entity.setBucket(body.getBucket());
@@ -55,16 +58,22 @@ public class StorageController {
         entity.setSecretKey(body.getSecretKey());
         entity.setRegion(body.getRegion());
         entity.setEndpoint(body.getEndpoint());
+        entity.setDomain(body.getDomain());
+        entity.setAcl(body.getAcl());
+        entity.setPathStyleAccess(body.getPathStyleAccess());
         entity.setVendor(body.getVendor());
         entity.setWebdavUrl(body.getWebdavUrl());
         entity.setWebdavUsername(body.getWebdavUsername());
         entity.setWebdavPassword(body.getWebdavPassword());
         entity.setMultipartThresholdMb(body.getMultipartThresholdMb());
         entity.setMultipartChunkMb(body.getMultipartChunkMb());
+        entity.setUploadConcurrency(body.getUploadConcurrency());
         entity.setUploadRetries(body.getUploadRetries());
+        entity.setExtraArgs(body.getExtraArgs());
         entity.setBasePath(body.getBasePath());
         entity.setConfigJson(body.getConfigJson());
         entity.setUpdatedAt(LocalDateTime.now());
+        fillDefaults(entity);
         fillInternalRemote(entity);
         return repository.save(entity);
     }
@@ -102,8 +111,36 @@ public class StorageController {
 
     private void fillInternalRemote(StorageConfig body) {
         if (StringUtils.isBlank(body.getRcloneRemote())) {
+            body.setRcloneRemote(body.getPlatform());
+        }
+    }
+
+    private void fillDefaults(StorageConfig body) {
+        if (StringUtils.isBlank(body.getPlatform())) {
             String type = body.getType() == null ? "storage" : body.getType().name().toLowerCase().replace('_', '-');
-            body.setRcloneRemote("dataark-" + type + "-" + System.currentTimeMillis());
+            body.setPlatform("dataark-" + type + "-" + System.currentTimeMillis());
+        }
+        body.setPlatform(body.getPlatform().trim().replaceAll("[^a-zA-Z0-9._-]", "-"));
+        if (body.getEnabled() == null) {
+            body.setEnabled(true);
+        }
+        if (StringUtils.isBlank(body.getAcl())) {
+            body.setAcl("private");
+        }
+        if (body.getPathStyleAccess() == null) {
+            body.setPathStyleAccess(false);
+        }
+        if (body.getMultipartThresholdMb() == null) {
+            body.setMultipartThresholdMb(100L);
+        }
+        if (body.getMultipartChunkMb() == null) {
+            body.setMultipartChunkMb(64L);
+        }
+        if (body.getUploadConcurrency() == null) {
+            body.setUploadConcurrency(4);
+        }
+        if (body.getUploadRetries() == null) {
+            body.setUploadRetries(3);
         }
     }
 }

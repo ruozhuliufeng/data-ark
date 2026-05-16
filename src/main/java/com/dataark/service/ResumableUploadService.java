@@ -265,12 +265,13 @@ public class ResumableUploadService {
         command.add("--low-level-retries");
         command.add(String.valueOf(uploadRetries(storage) * 3));
         command.add("--s3-upload-concurrency");
-        command.add("4");
+        command.add(String.valueOf(uploadConcurrency(storage)));
         command.add("--s3-upload-cutoff");
         command.add(Math.min(chunkMb(storage), 5120L) + "M");
         command.add("--s3-chunk-size");
         command.add(chunkMb(storage) + "M");
         command.add("--s3-leave-parts-on-error");
+        command.addAll(extraArgs(storage));
         return command;
     }
 
@@ -315,6 +316,24 @@ public class ResumableUploadService {
 
     private int uploadRetries(StorageConfig storage) {
         return Math.max(1, storage.getUploadRetries() == null ? 3 : storage.getUploadRetries());
+    }
+
+    private int uploadConcurrency(StorageConfig storage) {
+        return Math.max(1, storage.getUploadConcurrency() == null ? 4 : storage.getUploadConcurrency());
+    }
+
+    private List<String> extraArgs(StorageConfig storage) {
+        if (StringUtils.isBlank(storage.getExtraArgs())) {
+            return Collections.emptyList();
+        }
+        String[] parts = storage.getExtraArgs().trim().split("\\s+");
+        List<String> args = new ArrayList<String>();
+        for (String part : parts) {
+            if (StringUtils.isNotBlank(part)) {
+                args.add(part);
+            }
+        }
+        return args;
     }
 
     private long defaultLong(Long value, long fallback) {

@@ -38,19 +38,26 @@ export interface DataSourceConfig {
 export interface StorageConfig {
   id?: number
   name: string
+  platform?: string
+  enabled?: boolean
   type: StorageType
   bucket: string
   accessKey?: string
   secretKey?: string
   region?: string
   endpoint?: string
+  domain?: string
+  acl?: string
+  pathStyleAccess?: boolean
   vendor?: string
   webdavUrl?: string
   webdavUsername?: string
   webdavPassword?: string
   multipartThresholdMb?: number
   multipartChunkMb?: number
+  uploadConcurrency?: number
   uploadRetries?: number
+  extraArgs?: string
   rcloneRemote?: string
   basePath: string
   configJson?: string

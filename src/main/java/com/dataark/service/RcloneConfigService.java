@@ -21,6 +21,9 @@ public class RcloneConfigService {
     }
 
     public PreparedRclone prepare(StorageConfig storage) throws IOException {
+        if (Boolean.FALSE.equals(storage.getEnabled())) {
+            throw new IllegalStateException("Storage platform is disabled: " + storage.getName());
+        }
         File workDir = new File(properties.getWorkDir());
         workDir.mkdirs();
 
@@ -82,7 +85,10 @@ public class RcloneConfigService {
         appendIfPresent(builder, "secret_access_key", storage.getSecretKey());
         appendIfPresent(builder, "region", storage.getRegion());
         appendIfPresent(builder, "endpoint", endpoint(storage));
-        builder.append("acl = private").append(System.lineSeparator());
+        appendIfPresent(builder, "acl", StringUtils.defaultIfBlank(storage.getAcl(), "private"));
+        if (Boolean.TRUE.equals(storage.getPathStyleAccess())) {
+            builder.append("force_path_style = true").append(System.lineSeparator());
+        }
     }
 
     private void appendWebdav(StringBuilder builder, StorageConfig storage) {
@@ -138,6 +144,9 @@ public class RcloneConfigService {
     private String remoteName(StorageConfig storage) {
         if (StringUtils.isNotBlank(storage.getRcloneRemote())) {
             return storage.getRcloneRemote().trim();
+        }
+        if (StringUtils.isNotBlank(storage.getPlatform())) {
+            return storage.getPlatform().trim();
         }
         String id = storage.getId() == null ? "draft" : String.valueOf(storage.getId());
         return "dataark-" + storage.getType().name().toLowerCase().replace('_', '-') + "-" + id;

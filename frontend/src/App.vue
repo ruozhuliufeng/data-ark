@@ -165,8 +165,14 @@
           <el-button type="primary" :icon="Plus" @click="openStorage()">新增存储</el-button>
         </div>
         <el-table :data="storages" border>
+          <el-table-column prop="platform" label="平台" min-width="140" />
           <el-table-column prop="name" label="名称" min-width="120" />
           <el-table-column prop="type" label="类型" width="140" />
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">
+              <el-tag :type="row.enabled === false ? 'info' : 'success'">{{ row.enabled === false ? '停用' : '启用' }}</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column prop="bucket" label="Bucket" min-width="150" />
           <el-table-column prop="region" label="地点" min-width="130" />
           <el-table-column prop="endpoint" label="Endpoint" min-width="190" />
@@ -283,11 +289,13 @@
       <el-form label-width="126px">
         <div class="form-grid">
           <el-form-item label="名称"><el-input v-model="storageForm.name" /></el-form-item>
+          <el-form-item label="平台标识"><el-input v-model="storageForm.platform" placeholder="例如 qiniu-prod / minio-local" /></el-form-item>
           <el-form-item label="类型">
             <el-select v-model="storageForm.type" style="width: 100%">
               <el-option v-for="item in meta.storageTypes" :key="item" :label="storageLabel(item)" :value="item" />
             </el-select>
           </el-form-item>
+          <el-form-item label="启用"><el-switch v-model="storageForm.enabled" /></el-form-item>
           <template v-if="storageForm.type !== 'WEBDAV'">
             <el-form-item label="AK"><el-input v-model="storageForm.accessKey" placeholder="Access Key / Secret ID" /></el-form-item>
             <el-form-item label="SK"><el-input v-model="storageForm.secretKey" type="password" show-password placeholder="Secret Key" /></el-form-item>
@@ -298,6 +306,9 @@
             <el-form-item label="Endpoint" class="full">
               <el-input v-model="storageForm.endpoint" :placeholder="endpointPlaceholder" />
             </el-form-item>
+            <el-form-item label="访问域名"><el-input v-model="storageForm.domain" placeholder="可选，例如 https://cdn.example.com" /></el-form-item>
+            <el-form-item label="ACL"><el-input v-model="storageForm.acl" placeholder="private / public-read" /></el-form-item>
+            <el-form-item label="路径样式访问"><el-switch v-model="storageForm.pathStyleAccess" /></el-form-item>
           </template>
           <template v-else>
             <el-form-item label="WebDAV 地址" class="full"><el-input v-model="storageForm.webdavUrl" placeholder="https://example.com/dav" /></el-form-item>
@@ -309,7 +320,11 @@
           <el-form-item label="基础路径" class="full"><el-input v-model="storageForm.basePath" placeholder="/dataark" /></el-form-item>
           <el-form-item label="分片阈值(MB)"><el-input-number v-model="storageForm.multipartThresholdMb" :min="1" style="width: 100%" /></el-form-item>
           <el-form-item label="分片大小(MB)"><el-input-number v-model="storageForm.multipartChunkMb" :min="5" style="width: 100%" /></el-form-item>
+          <el-form-item label="上传并发"><el-input-number v-model="storageForm.uploadConcurrency" :min="1" :max="32" style="width: 100%" /></el-form-item>
           <el-form-item label="失败重试次数"><el-input-number v-model="storageForm.uploadRetries" :min="1" :max="20" style="width: 100%" /></el-form-item>
+          <el-form-item label="rclone 参数" class="full">
+            <el-input v-model="storageForm.extraArgs" placeholder="可选，例如 --transfers 4 --checkers 8" />
+          </el-form-item>
           <el-form-item label="补充信息" class="full">
             <el-input v-model="storageForm.configJson" type="textarea" :rows="2" placeholder="可选：备注或后续扩展配置" />
           </el-form-item>
@@ -639,19 +654,26 @@ function emptyDatasource(): DataSourceConfig {
 function emptyStorage(): StorageConfig {
   return {
     name: '',
+    platform: '',
+    enabled: true,
     type: 'MINIO',
     bucket: '',
     accessKey: '',
     secretKey: '',
     region: '',
     endpoint: '',
+    domain: '',
+    acl: 'private',
+    pathStyleAccess: false,
     vendor: '',
     webdavUrl: '',
     webdavUsername: '',
     webdavPassword: '',
     multipartThresholdMb: 100,
     multipartChunkMb: 64,
+    uploadConcurrency: 4,
     uploadRetries: 3,
+    extraArgs: '',
     basePath: '/dataark',
     configJson: ''
   }
@@ -661,10 +683,14 @@ function normalizeStorage(storage: StorageConfig): StorageConfig {
   return {
     ...emptyStorage(),
     ...storage,
+    enabled: storage.enabled !== false,
     bucket: storage.bucket || '',
+    acl: storage.acl || 'private',
+    pathStyleAccess: Boolean(storage.pathStyleAccess),
     basePath: storage.basePath || '/dataark',
     multipartThresholdMb: storage.multipartThresholdMb || 100,
     multipartChunkMb: storage.multipartChunkMb || 64,
+    uploadConcurrency: storage.uploadConcurrency || 4,
     uploadRetries: storage.uploadRetries || 3
   }
 }
