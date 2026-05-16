@@ -9,6 +9,7 @@ import com.obs.services.model.PutObjectRequest;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
+import java.io.InputStream;
 
 public class HuaweiObsStorageClient extends AbstractStorageClient {
     private final ObsClient client;
@@ -27,11 +28,22 @@ public class HuaweiObsStorageClient extends AbstractStorageClient {
     @Override
     public void put(String objectKey, File file) {
         PutObjectRequest request = new PutObjectRequest(storage.getBucket(), objectKey, file);
+        applyAcl(request);
+        client.putObject(request);
+    }
+
+    @Override
+    public void put(String objectKey, InputStream input, long contentLength) {
+        PutObjectRequest request = new PutObjectRequest(storage.getBucket(), objectKey, input);
+        applyAcl(request);
+        client.putObject(request);
+    }
+
+    private void applyAcl(PutObjectRequest request) {
         AccessControlList acl = acl(storage.getAcl());
         if (acl != null) {
             request.setAcl(acl);
         }
-        client.putObject(request);
     }
 
     @Override

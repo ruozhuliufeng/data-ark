@@ -64,7 +64,7 @@ public class BackupExecutionService {
         new File(properties.getLogDir()).mkdirs();
     }
 
-    @Async
+    @Async("backupTaskExecutor")
     public void runAsync(Long jobId) {
         runNow(jobId);
     }
@@ -144,6 +144,7 @@ public class BackupExecutionService {
         List<String> command = new ArrayList<String>();
         command.add("gzip");
         command.add("-f");
+        command.add("-" + Math.max(1, Math.min(9, properties.getGzipLevel())));
         command.add(inputFile.getAbsolutePath());
         commandLog.append("$ ").append(maskCommand(command)).append(System.lineSeparator());
         CommandResult result = commandRunner.run(command, Collections.<String, String>emptyMap(), new File(properties.getWorkDir()));

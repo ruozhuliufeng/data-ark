@@ -8,12 +8,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Properties;
 
 @Service
@@ -69,14 +68,10 @@ public class ResumableUploadService {
                                           String manifestFile,
                                           StringBuilder commandLog) throws IOException {
         MultipartManifest manifest = loadOrCreateManifest(file, storage, remotePath, manifestFile);
-        File partsDir = new File(manifest.partsDir);
-        partsDir.mkdirs();
-        splitMissingParts(file, manifest, partsDir, commandLog);
 
         ObjectStorageClient client = clientFactory.create(storage);
         int uploaded = countUploaded(manifest);
         for (int i = 0; i < manifest.totalParts; i++) {
-            File partFile = partFile(partsDir, file.getName(), i);
             String partRemote = partRemotePath(remotePath, file.getName(), i);
             if (remoteExists(client, partRemote, commandLog)) {
                 markUploaded(manifest, i);
@@ -85,11 +80,12 @@ public class ResumableUploadService {
                 continue;
             }
             commandLog.append("SDK multipart upload part ").append(i + 1).append("/")
-                    .append(manifest.totalParts).append(" ")
-                    .append(partFile.getAbsolutePath()).append(" -> ")
+                    .append(manifest.totalParts).append(" offset=")
+                    .append(partOffset(manifest, i)).append(", bytes=")
+                    .append(partLength(file, manifest, i)).append(" -> ")
                     .append(partRemote).append(System.lineSeparator());
             try {
-                client.put(partRemote, partFile);
+                uploadPart(client, partRemote, file, manifest, i);
             } catch (Exception e) {
                 saveManifest(manifest);
                 throw new IllegalStateException("Multipart upload failed at part " + (i + 1) + "/" + manifest.totalParts
@@ -123,8 +119,6 @@ public class ResumableUploadService {
         manifest.totalParts = (int) ((file.length() + manifest.chunkBytes - 1) / manifest.chunkBytes);
         File manifestDir = new File(properties.getWorkDir(), "multipart-manifests");
         manifestDir.mkdirs();
-        File partsDir = new File(properties.getWorkDir(), "multipart-parts/" + safeName(file.getName()) + "-" + System.currentTimeMillis());
-        manifest.partsDir = partsDir.getAbsolutePath();
         manifest.manifestFile = new File(manifestDir, safeName(file.getName()) + "-" + System.currentTimeMillis() + ".properties").getAbsolutePath();
         manifest.uploadedParts = "";
         saveManifest(manifest);
@@ -143,7 +137,6 @@ public class ResumableUploadService {
         manifest.manifestFile = file.getAbsolutePath();
         manifest.sourceFile = props.getProperty("sourceFile");
         manifest.remotePath = props.getProperty("remotePath");
-        manifest.partsDir = props.getProperty("partsDir");
         manifest.chunkBytes = Long.parseLong(props.getProperty("chunkBytes"));
         manifest.totalParts = Integer.parseInt(props.getProperty("totalParts"));
         manifest.uploadedParts = props.getProperty("uploadedParts", "");
@@ -154,7 +147,6 @@ public class ResumableUploadService {
         Properties props = new Properties();
         props.setProperty("sourceFile", manifest.sourceFile);
         props.setProperty("remotePath", manifest.remotePath);
-        props.setProperty("partsDir", manifest.partsDir);
         props.setProperty("chunkBytes", String.valueOf(manifest.chunkBytes));
         props.setProperty("totalParts", String.valueOf(manifest.totalParts));
         props.setProperty("uploadedParts", manifest.uploadedParts);
@@ -166,56 +158,37 @@ public class ResumableUploadService {
         }
     }
 
-    private void splitMissingParts(File source,
-                                   MultipartManifest manifest,
-                                   File partsDir,
-                                   StringBuilder commandLog) throws IOException {
-        boolean complete = true;
-        for (int i = 0; i < manifest.totalParts; i++) {
-            if (!partFile(partsDir, source.getName(), i).exists()) {
-                complete = false;
-                break;
-            }
-        }
-        if (complete) {
-            return;
-        }
-
-        commandLog.append("Splitting large backup into ").append(manifest.totalParts)
-                .append(" parts, chunkBytes=").append(manifest.chunkBytes).append(System.lineSeparator());
-        BufferedInputStream input = new BufferedInputStream(new FileInputStream(source));
+    private void uploadPart(ObjectStorageClient client,
+                            String partRemote,
+                            File source,
+                            MultipartManifest manifest,
+                            int part) throws IOException {
+        FileInputStream fileInput = new FileInputStream(source);
         try {
-            byte[] buffer = new byte[1024 * 1024];
-            for (int part = 0; part < manifest.totalParts; part++) {
-                File output = partFile(partsDir, source.getName(), part);
-                if (output.exists()) {
-                    skipFully(input, manifest.chunkBytes);
-                    continue;
-                }
-                BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(output));
-                try {
-                    long remaining = manifest.chunkBytes;
-                    int read;
-                    while (remaining > 0 && (read = input.read(buffer, 0, (int) Math.min(buffer.length, remaining))) != -1) {
-                        out.write(buffer, 0, read);
-                        remaining -= read;
-                    }
-                } finally {
-                    out.close();
-                }
-            }
+            skipFully(fileInput, partOffset(manifest, part));
+            InputStream limited = new LimitedInputStream(new BufferedInputStream(fileInput, 1024 * 1024), partLength(source, manifest, part));
+            client.put(partRemote, limited, partLength(source, manifest, part));
         } finally {
-            input.close();
+            fileInput.close();
         }
     }
 
-    private void skipFully(BufferedInputStream input, long bytes) throws IOException {
+    private long partOffset(MultipartManifest manifest, int part) {
+        return manifest.chunkBytes * part;
+    }
+
+    private long partLength(File source, MultipartManifest manifest, int part) {
+        long offset = partOffset(manifest, part);
+        return Math.min(manifest.chunkBytes, source.length() - offset);
+    }
+
+    private void skipFully(InputStream input, long bytes) throws IOException {
         long remaining = bytes;
         while (remaining > 0) {
             long skipped = input.skip(remaining);
             if (skipped <= 0) {
                 if (input.read() == -1) {
-                    return;
+                    throw new IOException("Unexpected end of file while skipping " + bytes + " bytes");
                 }
                 skipped = 1;
             }
@@ -250,10 +223,6 @@ public class ResumableUploadService {
         }
     }
 
-    private File partFile(File partsDir, String fileName, int part) {
-        return new File(partsDir, safeName(fileName) + ".part" + String.format("%05d", part));
-    }
-
     private String partRemotePath(String remotePath, String fileName, int part) {
         return remotePath + ".parts/" + safeName(fileName) + ".part" + String.format("%05d", part);
     }
@@ -282,9 +251,42 @@ public class ResumableUploadService {
         private String manifestFile;
         private String sourceFile;
         private String remotePath;
-        private String partsDir;
         private long chunkBytes;
         private int totalParts;
         private String uploadedParts;
+    }
+
+    private static class LimitedInputStream extends InputStream {
+        private final InputStream delegate;
+        private long remaining;
+
+        LimitedInputStream(InputStream delegate, long limit) {
+            this.delegate = delegate;
+            this.remaining = limit;
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int value = delegate.read();
+            if (value != -1) {
+                remaining--;
+            }
+            return value;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int read = delegate.read(b, off, (int) Math.min(len, remaining));
+            if (read > 0) {
+                remaining -= read;
+            }
+            return read;
+        }
     }
 }

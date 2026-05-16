@@ -136,6 +136,21 @@ PostgreSQL -> pg_dump
 
 本机运行时需要提前安装数据库备份命令和 `gzip`。Docker 镜像会内置 `default-mysql-client`、`postgresql-client` 和 `gzip`；对象存储上传由 Java SDK 完成。
 
+## 大文件资源控制
+
+大文件上传采用流式分片读取，不会再把完整备份文件预先复制成一批本地 part 文件。默认只允许 1 个备份任务并发执行：
+
+```text
+DATAARK_BACKUP_CONCURRENCY=1
+DATAARK_GZIP_LEVEL=1
+```
+
+Docker 默认设置 JVM 容器资源参数：
+
+```text
+JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=65 -XX:ActiveProcessorCount=2"
+```
+
 ## Cron 说明
 
 Spring Cron 使用 6 位格式：

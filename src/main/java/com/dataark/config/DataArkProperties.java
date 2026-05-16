@@ -11,6 +11,8 @@ public class DataArkProperties {
     private String workDir = "./work";
     private String backupDir = "./backup";
     private String logDir = "./logs";
+    private int backupConcurrency = 1;
+    private int gzipLevel = 1;
     private Command command = new Command();
 
     public boolean isInitialized() {
@@ -51,6 +53,22 @@ public class DataArkProperties {
 
     public void setLogDir(String logDir) {
         this.logDir = logDir;
+    }
+
+    public int getBackupConcurrency() {
+        return backupConcurrency;
+    }
+
+    public void setBackupConcurrency(int backupConcurrency) {
+        this.backupConcurrency = backupConcurrency;
+    }
+
+    public int getGzipLevel() {
+        return gzipLevel;
+    }
+
+    public void setGzipLevel(int gzipLevel) {
+        this.gzipLevel = gzipLevel;
     }
 
     public Command getCommand() {

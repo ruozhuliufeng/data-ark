@@ -10,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.InputStream;
 
 public class MinioStorageClient extends AbstractStorageClient {
     private final MinioClient client;
@@ -31,14 +32,23 @@ public class MinioStorageClient extends AbstractStorageClient {
         try {
             FileInputStream input = new FileInputStream(file);
             try {
-                client.putObject(PutObjectArgs.builder()
-                        .bucket(storage.getBucket())
-                        .object(objectKey)
-                        .stream(input, file.length(), -1)
-                        .build());
+                put(objectKey, input, file.length());
             } finally {
                 input.close();
             }
+        } catch (Exception e) {
+            throw new IllegalStateException("MinIO upload failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void put(String objectKey, InputStream input, long contentLength) {
+        try {
+            client.putObject(PutObjectArgs.builder()
+                    .bucket(storage.getBucket())
+                    .object(objectKey)
+                    .stream(input, contentLength, -1)
+                    .build());
         } catch (Exception e) {
             throw new IllegalStateException("MinIO upload failed: " + e.getMessage(), e);
         }

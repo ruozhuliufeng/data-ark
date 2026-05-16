@@ -6,6 +6,7 @@ import com.github.sardine.SardineFactory;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
+import java.io.InputStream;
 
 public class WebdavStorageClient extends AbstractStorageClient {
     private final Sardine sardine;
@@ -27,6 +28,16 @@ public class WebdavStorageClient extends AbstractStorageClient {
         try {
             ensureParentDirectories(objectKey);
             sardine.put(url(objectKey), file, null, true);
+        } catch (Exception e) {
+            throw new IllegalStateException("WebDAV upload failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void put(String objectKey, InputStream input, long contentLength) {
+        try {
+            ensureParentDirectories(objectKey);
+            sardine.put(url(objectKey), input, null, true, contentLength);
         } catch (Exception e) {
             throw new IllegalStateException("WebDAV upload failed: " + e.getMessage(), e);
         }

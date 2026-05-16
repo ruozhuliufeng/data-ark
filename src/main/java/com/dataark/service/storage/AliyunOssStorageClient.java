@@ -9,6 +9,7 @@ import com.dataark.model.StorageConfig;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
+import java.io.InputStream;
 
 public class AliyunOssStorageClient extends AbstractStorageClient {
     private final OSS client;
@@ -21,12 +22,23 @@ public class AliyunOssStorageClient extends AbstractStorageClient {
 
     @Override
     public void put(String objectKey, File file) {
+        ObjectMetadata metadata = metadata(file.length());
+        client.putObject(new PutObjectRequest(storage.getBucket(), objectKey, file, metadata));
+    }
+
+    @Override
+    public void put(String objectKey, InputStream input, long contentLength) {
+        ObjectMetadata metadata = metadata(contentLength);
+        client.putObject(new PutObjectRequest(storage.getBucket(), objectKey, input, metadata));
+    }
+
+    private ObjectMetadata metadata(long contentLength) {
         ObjectMetadata metadata = new ObjectMetadata();
-        metadata.setContentLength(file.length());
+        metadata.setContentLength(contentLength);
         if (StringUtils.isNotBlank(storage.getAcl())) {
             metadata.setHeader("x-oss-object-acl", storage.getAcl());
         }
-        client.putObject(new PutObjectRequest(storage.getBucket(), objectKey, file, metadata));
+        return metadata;
     }
 
     @Override

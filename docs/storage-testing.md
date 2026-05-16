@@ -40,13 +40,30 @@ DataArk 参考 `x-file-storage` 的平台化思路统一配置对象存储，但
 
 ## 大文件分片与断点续传
 
-当备份文件达到“分片阈值”后，DataArk 会先在 `work/multipart-parts/` 下切分 part 文件，再逐片上传到：
+当备份文件达到“分片阈值”后，DataArk 会从原备份文件按固定 offset 流式读取 part，不再先复制出本地分片文件，然后逐片上传到：
 
 ```text
 {remotePath}.parts/{fileName}.part00000
 ```
 
 上传过程会在 `work/multipart-manifests/` 生成 manifest，记录源文件、远端路径、分片大小和已上传 part。若任务中断或失败，只要本地备份文件和 manifest 仍存在，执行记录页会显示“继续上传”，点击后会跳过远端已经存在的 part，只补传剩余分片。
+
+## 资源占用控制
+
+默认只允许 1 个备份任务同时执行，避免多个大文件 dump、压缩和上传互相叠加。可通过环境变量调整：
+
+```bash
+export DATAARK_BACKUP_CONCURRENCY=1
+export DATAARK_GZIP_LEVEL=1
+```
+
+Docker 默认带有：
+
+```text
+JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=65 -XX:ActiveProcessorCount=2"
+```
+
+如果服务器资源较小，建议保持 `DATAARK_BACKUP_CONCURRENCY=1`、`DATAARK_GZIP_LEVEL=1`，并适当调低页面里的分片大小和上传并发。
 
 当前已内置 SDK 适配器：
 

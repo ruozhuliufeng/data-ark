@@ -33,7 +33,10 @@ ENV DATAARK_PORT=7001 \
     DATAARK_DATA_DIR=/app/data \
     DATAARK_WORK_DIR=/app/work \
     DATAARK_BACKUP_DIR=/app/backup \
-    DATAARK_LOG_DIR=/app/logs
+    DATAARK_LOG_DIR=/app/logs \
+    DATAARK_BACKUP_CONCURRENCY=1 \
+    DATAARK_GZIP_LEVEL=1 \
+    JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=65 -XX:ActiveProcessorCount=2"
 
 VOLUME ["/app/config", "/app/data", "/app/work", "/app/backup", "/app/logs"]
 EXPOSE 7001

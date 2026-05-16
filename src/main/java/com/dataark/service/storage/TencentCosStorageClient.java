@@ -7,11 +7,13 @@ import com.qcloud.cos.auth.BasicCOSCredentials;
 import com.qcloud.cos.auth.COSCredentials;
 import com.qcloud.cos.model.CannedAccessControlList;
 import com.qcloud.cos.model.ListObjectsRequest;
+import com.qcloud.cos.model.ObjectMetadata;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.region.Region;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
+import java.io.InputStream;
 
 public class TencentCosStorageClient extends AbstractStorageClient {
     private final COSClient client;
@@ -29,11 +31,24 @@ public class TencentCosStorageClient extends AbstractStorageClient {
     @Override
     public void put(String objectKey, File file) {
         PutObjectRequest request = new PutObjectRequest(storage.getBucket(), objectKey, file);
+        applyAcl(request);
+        client.putObject(request);
+    }
+
+    @Override
+    public void put(String objectKey, InputStream input, long contentLength) {
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(contentLength);
+        PutObjectRequest request = new PutObjectRequest(storage.getBucket(), objectKey, input, metadata);
+        applyAcl(request);
+        client.putObject(request);
+    }
+
+    private void applyAcl(PutObjectRequest request) {
         CannedAccessControlList acl = acl(storage.getAcl());
         if (acl != null) {
             request.withCannedAcl(acl);
         }
-        client.putObject(request);
     }
 
     @Override

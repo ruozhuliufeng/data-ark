@@ -24,6 +24,8 @@ dataark:
   work-dir: ${DATAARK_WORK_DIR:./work}
   backup-dir: ${DATAARK_BACKUP_DIR:./backup}
   log-dir: ${DATAARK_LOG_DIR:./logs}
+  backup-concurrency: ${DATAARK_BACKUP_CONCURRENCY:1}
+  gzip-level: ${DATAARK_GZIP_LEVEL:1}
   command:
     mysqldump: ${DATAARK_MYSQLDUMP:mysqldump}
     pg-dump: ${DATAARK_PG_DUMP:pg_dump}

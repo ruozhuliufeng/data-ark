@@ -10,6 +10,7 @@ import com.qiniu.util.Auth;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
+import java.io.InputStream;
 
 public class QiniuKodoStorageClient extends AbstractStorageClient {
     private final Auth auth;
@@ -31,6 +32,15 @@ public class QiniuKodoStorageClient extends AbstractStorageClient {
     public void put(String objectKey, File file) {
         try {
             uploadManager.put(file, objectKey, auth.uploadToken(storage.getBucket(), objectKey));
+        } catch (QiniuException e) {
+            throw new IllegalStateException("Qiniu Kodo upload failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void put(String objectKey, InputStream input, long contentLength) {
+        try {
+            uploadManager.put(input, contentLength, objectKey, auth.uploadToken(storage.getBucket(), objectKey), null, null, false);
         } catch (QiniuException e) {
             throw new IllegalStateException("Qiniu Kodo upload failed: " + e.getMessage(), e);
         }

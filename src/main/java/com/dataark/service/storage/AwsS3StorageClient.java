@@ -14,6 +14,7 @@ import com.dataark.model.StorageConfig;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.File;
+import java.io.InputStream;
 
 public class AwsS3StorageClient extends AbstractStorageClient {
     private final AmazonS3 client;
@@ -40,11 +41,24 @@ public class AwsS3StorageClient extends AbstractStorageClient {
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(file.length());
         PutObjectRequest request = new PutObjectRequest(storage.getBucket(), objectKey, file).withMetadata(metadata);
+        applyAcl(request);
+        client.putObject(request);
+    }
+
+    @Override
+    public void put(String objectKey, InputStream input, long contentLength) {
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(contentLength);
+        PutObjectRequest request = new PutObjectRequest(storage.getBucket(), objectKey, input, metadata);
+        applyAcl(request);
+        client.putObject(request);
+    }
+
+    private void applyAcl(PutObjectRequest request) {
         CannedAccessControlList acl = acl(storage.getAcl());
         if (acl != null) {
             request.withCannedAcl(acl);
         }
-        client.putObject(request);
     }
 
     @Override
