@@ -62,6 +62,12 @@ http://localhost:7001
 docker compose up -d --build
 ```
 
+服务器更新并重启：
+
+```bash
+./scripts/redeploy.sh
+```
+
 访问：
 
 ```text
