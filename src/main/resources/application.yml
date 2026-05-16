@@ -1,0 +1,30 @@
+server:
+  port: ${DATAARK_PORT:8080}
+
+spring:
+  config:
+    import: optional:file:${DATAARK_CONFIG_FILE:./config/dataark.properties}
+  application:
+    name: data-ark
+  datasource:
+    driver-class-name: ${DATAARK_DB_DRIVER:org.sqlite.JDBC}
+    url: ${DATAARK_DB_URL:jdbc:sqlite:${DATAARK_DATA_DIR:./data}/dataark.db}
+    username: ${DATAARK_DB_USERNAME:}
+    password: ${DATAARK_DB_PASSWORD:}
+  jpa:
+    database-platform: ${DATAARK_DB_DIALECT:com.dataark.config.SQLiteDialect}
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+
+dataark:
+  initialized: ${DATAARK_INITIALIZED:false}
+  config-file: ${DATAARK_CONFIG_FILE:./config/dataark.properties}
+  work-dir: ${DATAARK_WORK_DIR:./work}
+  backup-dir: ${DATAARK_BACKUP_DIR:./backup}
+  log-dir: ${DATAARK_LOG_DIR:./logs}
+  command:
+    mysqldump: ${DATAARK_MYSQLDUMP:mysqldump}
+    pg-dump: ${DATAARK_PG_DUMP:pg_dump}
+    rclone: ${DATAARK_RCLONE:rclone}

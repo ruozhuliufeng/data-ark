@@ -1,0 +1,9 @@
+# DataArk initialization config example
+DATAARK_INITIALIZED=false
+DATAARK_DB_DRIVER=com.mysql.cj.jdbc.Driver
+DATAARK_DB_URL=jdbc:mysql://127.0.0.1:3306/data_ark?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+DATAARK_DB_USERNAME=dataark
+DATAARK_DB_PASSWORD=change-me
+DATAARK_DB_DIALECT=org.hibernate.dialect.MySQL8Dialect
+dataark.admin.username=admin
+dataark.admin.password-hash=change-me-after-initialization

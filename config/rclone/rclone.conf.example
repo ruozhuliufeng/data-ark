@@ -1,0 +1,54 @@
+[minio]
+type = s3
+provider = Minio
+access_key_id = your-access-key
+secret_access_key = your-secret-key
+endpoint = http://minio:9000
+acl = private
+
+[aliyun]
+type = s3
+provider = Alibaba
+access_key_id = your-access-key
+secret_access_key = your-secret-key
+endpoint = oss-cn-hangzhou.aliyuncs.com
+acl = private
+
+[aws-s3]
+type = s3
+provider = AWS
+access_key_id = your-access-key
+secret_access_key = your-secret-key
+region = ap-east-1
+acl = private
+
+[tencent-cos]
+type = s3
+provider = TencentCOS
+access_key_id = your-secret-id
+secret_access_key = your-secret-key
+endpoint = cos.ap-guangzhou.myqcloud.com
+acl = private
+
+[huawei-obs]
+type = s3
+provider = HuaweiOBS
+access_key_id = your-access-key
+secret_access_key = your-secret-key
+endpoint = obs.cn-east-3.myhuaweicloud.com
+acl = private
+
+[qiniu]
+type = s3
+provider = Qiniu
+access_key_id = your-access-key
+secret_access_key = your-secret-key
+endpoint = s3-cn-east-1.qiniucs.com
+acl = private
+
+[webdav]
+type = webdav
+url = https://example.com/dav
+vendor = other
+user = your-user
+pass = your-obscured-password
