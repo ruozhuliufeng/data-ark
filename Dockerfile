@@ -1,7 +1,11 @@
 FROM node:22-alpine AS frontend-build
 WORKDIR /frontend
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm config set registry https://registry.npmjs.org/ \
+    && npm config set fetch-retries 5 \
+    && npm config set fetch-retry-mintimeout 20000 \
+    && npm config set fetch-retry-maxtimeout 120000 \
+    && npm ci
 COPY frontend ./
 RUN npm run build
 
@@ -10,7 +14,7 @@ WORKDIR /build
 COPY pom.xml .
 RUN mvn -q -DskipTests dependency:go-offline
 COPY src ./src
-COPY frontend ./frontend
+COPY frontend/package*.json ./frontend/
 COPY --from=frontend-build /frontend/dist ./frontend/dist
 RUN mvn -q -DskipTests package
 
