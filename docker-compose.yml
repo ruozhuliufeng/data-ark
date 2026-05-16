@@ -4,9 +4,9 @@ services:
     container_name: dataark
     restart: unless-stopped
     ports:
-      - "9001:9001"
+      - "7001:7001"
     environment:
-      DATAARK_PORT: 9001
+      DATAARK_PORT: 7001
       DATAARK_CONFIG_FILE: /app/config/dataark.properties
       DATAARK_DATA_DIR: /app/data
       DATAARK_WORK_DIR: /app/work

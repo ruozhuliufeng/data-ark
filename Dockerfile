@@ -28,7 +28,7 @@ RUN apt-get update \
 
 COPY --from=build /build/target/data-ark-0.1.0-SNAPSHOT.jar /app/data-ark.jar
 
-ENV DATAARK_PORT=9001 \
+ENV DATAARK_PORT=7001 \
     DATAARK_CONFIG_FILE=/app/config/dataark.properties \
     DATAARK_DATA_DIR=/app/data \
     DATAARK_WORK_DIR=/app/work \
@@ -36,6 +36,6 @@ ENV DATAARK_PORT=9001 \
     DATAARK_LOG_DIR=/app/logs
 
 VOLUME ["/app/config", "/app/data", "/app/work", "/app/backup", "/app/logs", "/root/.config/rclone"]
-EXPOSE 9001
+EXPOSE 7001
 
 ENTRYPOINT ["java", "-jar", "/app/data-ark.jar"]
