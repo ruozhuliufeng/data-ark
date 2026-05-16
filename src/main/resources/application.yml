@@ -1,5 +1,5 @@
 server:
-  port: ${DATAARK_PORT:8080}
+  port: ${DATAARK_PORT:9001}
 
 spring:
   config:

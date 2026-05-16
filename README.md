@@ -43,7 +43,7 @@ mvn spring-boot:run
 访问：
 
 ```text
-http://localhost:8080
+http://localhost:9001
 ```
 
 默认数据目录：
@@ -65,7 +65,7 @@ docker compose up -d --build
 访问：
 
 ```text
-http://服务器IP:8080
+http://服务器IP:9001
 ```
 
 挂载目录：
